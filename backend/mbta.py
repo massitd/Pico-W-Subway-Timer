@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, render_template
 import requests
 from datetime import datetime, timezone
 from dateutil import parser
@@ -10,9 +10,9 @@ app = Flask(__name__)
 MBTA_API_KEY = 'd559228707644768b4cd1e5696b396db'
 MBTA_URL = (
     'https://api-v3.mbta.com/predictions'
-    '?filter[stop]=place-harsq'    # set which stop
-    '&filter[route]=Red'           # set which line
-    '&filter[direction_id]=1'      # set direction
+    '?filter[stop]=place-gover'    # set which stop
+    '&filter[route]=Green-D'           # set which line
+    '&filter[direction_id]=0'      # set direction
     '&sort=departure_time'         # sort soonest first
     '&api_key=d559228707644768b4cd1e5696b396db')
 
@@ -22,8 +22,7 @@ train_data_cache = {
 }
 
 
-@app.route("/api/times")
-def  fetch_train_data():
+def  get_train_data_raw():
     try:
         # request to mbta API
         response = requests.get(MBTA_URL)
@@ -54,10 +53,10 @@ def  fetch_train_data():
                     })
 
         # return the next two trains
-        return jsonify({
+        return {
             'next_train': departures[0] if len(departures) > 0 else None,
             'following_train': departures[1] if len(departures) > 1 else None
-        })
+        }
 
 
     except Exception as e:
@@ -67,17 +66,17 @@ def  fetch_train_data():
 @app.route("/api/times")
 def get_train_times():
     try:
-        data = fetch_train_data()
+        data = get_train_data_raw()
         return jsonify(data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# background thread uses fetch_train_data()
+# background thread uses get_train_data_raw()
 def update_train_data_loop(interval_seconds=10):
     with app.app_context():
         while True:
             try:
-                train_data = fetch_train_data()
+                train_data = get_train_data_raw()
                 train_data_cache.update(train_data)
                 print("Train data updated")
             except Exception as e:
