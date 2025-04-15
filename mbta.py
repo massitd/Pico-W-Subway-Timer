@@ -61,7 +61,12 @@ def  get_train_data_raw():
 
     except Exception as e:
         # returns error info if there's a problem
-        return jsonify({'error': str(e)}), 500
+        return {
+            'next_train': None,
+            'following_train': None,
+            'error': str(e)
+        }
+
 
 @app.route("/api/times")
 def get_train_times():
