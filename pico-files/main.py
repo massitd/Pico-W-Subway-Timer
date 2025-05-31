@@ -14,12 +14,13 @@ def connect_wifi(ssid, password):
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     if not wlan.isconnected():
-        print("Connecting to Wi-Fi...")
         wlan.connect(ssid, password)
         attempt = 0
         while not wlan.isconnected() and attempt < 10:
             time.sleep(1)
             attempt += 1
+
+    draw_wifi_status(wlan.isconnected())  # ← draw red circle if not connected
 
     if wlan.isconnected():
         print("Connected:", wlan.ifconfig())
@@ -114,6 +115,12 @@ def draw_background(offset):
             if (x + y + offset) % 12 < 6:
                 lcd.rect(x, y, 4, 4, 0xC618, True)
     lcd.show()
+
+# wifi helper drawing
+def draw_wifi_status(connected):
+    if not connected:
+        # small red circle in top-right corner (e.g., 150x10)
+        fill_circle(150, 10, 5, 0xF800)  # 0xF800 = pure red in BGR565
 
 
 # main refresh loop
