@@ -8,64 +8,71 @@ import time
 app = Flask(__name__)
 
 MBTA_API_KEY = 'd559228707644768b4cd1e5696b396db'
-MBTA_URL = (
-    'https://api-v3.mbta.com/predictions'
-    '?filter[stop]=place-gover'    # set which stop
-    '&filter[route]=Green-D'           # set which line
-    '&filter[direction_id]=0'      # set direction
-    '&sort=departure_time'         # sort soonest first
-    '&api_key=d559228707644768b4cd1e5696b396db')
+
+MBTA_STOP = 'place-gover'  # Government Center
+MBTA_ROUTES = ['Green-D', 'Green-E']  # Multiple lines at this stop
+
+def make_url(route):
+    return (
+        f'https://api-v3.mbta.com/predictions'
+        f'?filter[stop]={MBTA_STOP}'
+        f'&filter[route]={route}'
+        f'&filter[direction_id]=0'
+        f'&sort=departure_time'
+        f'&api_key={MBTA_API_KEY}'
+    )
+
 
 train_data_cache = {
-    'next_train': None,
-    'following_train': None
+    'green_d': {
+        'next_train': None,
+        'following_train': None
+    },
+    'green_e': {
+        'next_train': None,
+        'following_train': None
+    }
 }
 
-
-def  get_train_data_raw():
+def fetch_departures_for_route(url):
     try:
-        # request to mbta API
-        response = requests.get(MBTA_URL)
+        response = requests.get(url)
         response.raise_for_status()
-
-        # parse JSON response
         mbta_data = response.json()
+        now = datetime.now(timezone.utc)
         departures = []
 
-        # get current time in UTC
-        now = datetime.now(timezone.utc)
-
-        # loop over each prediction entry
         for item in mbta_data.get('data', []):
             dep_time_str = item['attributes'].get('departure_time')
             if dep_time_str:
-                # parse ISO 8601 time into datetime object
                 dep_time = parser.isoparse(dep_time_str)
-
-                # calculate minutes till departure
                 minutes_away = (dep_time - now).total_seconds() / 60
-
-                # only include trains in the future
                 if minutes_away >= 0:
                     departures.append({
                         'minutes_away': int(round(minutes_away)),
                         'departure_time': dep_time_str
                     })
-
-        # return the next two trains
-        return {
-            'next_train': departures[0] if len(departures) > 0 else None,
-            'following_train': departures[1] if len(departures) > 1 else None
-        }
-
+        return departures
 
     except Exception as e:
-        # returns error info if there's a problem
-        return {
-            'next_train': None,
-            'following_train': None,
-            'error': str(e)
+        print("Error fetching route:", e)
+        return []
+
+def get_train_data_raw():
+    green_d = fetch_departures_for_route(make_url('Green-D'))
+    green_e = fetch_departures_for_route(make_url('Green-E'))
+
+    return {
+        'green_d': {
+            'next_train': green_d[0] if len(green_d) > 0 else None,
+            'following_train': green_d[1] if len(green_d) > 1 else None
+        },
+        'green_e': {
+            'next_train': green_e[0] if len(green_e) > 0 else None,
+            'following_train': green_e[1] if len(green_e) > 1 else None
         }
+    }
+
 
 
 @app.route("/api/times")
@@ -105,4 +112,4 @@ def api_train_times():
     return jsonify(train_data_cache)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=8080)
